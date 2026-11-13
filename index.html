@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="vi" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cân & Tính Tiền Đi Chợ Online</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons cho giao diện sắc nét -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Tùy chỉnh thanh trượt và ẩn mũi tên input number để tối ưu cho di động */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        /* Thanh trượt mượt mà */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 26px;
+            width: 26px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+            border: 3px solid #ffffff;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: #334155;
+        }
+        /* Hiệu ứng nảy nhẹ khi bấm nút */
+        .btn-press:active {
+            transform: scale(0.96);
+        }
+        /* Tránh cuộn ngang */
+        body {
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors duration-200 pb-24">
+
+    <!-- Thông báo Toast (thay thế alert) -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-4">
+        <div class="bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 px-5 py-3 rounded-2xl shadow-xl font-medium text-sm flex items-center gap-2">
+            <i id="toast-icon" class="ph-fill ph-check-circle text-emerald-400 dark:text-emerald-600 text-lg"></i>
+            <span id="toast-msg">Đã thêm vào giỏ hàng!</span>
+        </div>
+    </div>
+
+    <!-- Modal Xác Nhận Xóa (thay thế confirm) -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-800">
+            <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mb-4 mx-auto">
+                <i class="ph-bold ph-trash text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-center mb-2">Xóa toàn bộ giỏ hàng?</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">Bạn sẽ không thể khôi phục danh sách các món đã lưu sau khi xóa.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="closeConfirmModal()" class="py-3.5 px-4 rounded-2xl font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 btn-press">Hủy bỏ</button>
+                <button onclick="executeClearCart()" class="py-3.5 px-4 rounded-2xl font-semibold bg-red-600 text-white shadow-lg shadow-red-600/30 btn-press">Xóa hết</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header cố định trên cùng -->
+    <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 py-3.5">
+        <div class="max-w-lg mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+                    <i class="ph-bold ph-scales text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base leading-tight">Cân Đi Chợ</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Tính tiền chuẩn • Chống cân gian</p>
+                </div>
+            </div>
+            <button onclick="toggleTheme()" aria-label="Đổi giao diện Sáng/Tối" class="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 btn-press border border-slate-200/50 dark:border-slate-700/50">
+                <i id="theme-icon" class="ph-bold ph-moon text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Nội dung chính -->
+    <main class="max-w-lg mx-auto px-4 pt-4">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: CÂN & TÍNH TIỀN NHANH               -->
+        <!-- ========================================== -->
+        <section id="tab-calc" class="space-y-4">
+            
+            <!-- Màn hình hiển thị kết quả kiểu mặt cân điện tử -->
+            <div class="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-900 dark:to-black text-white rounded-3xl p-5 shadow-xl border border-slate-700/60 relative overflow-hidden">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Trọng lượng tịnh (Đã trừ bì)
+                    </span>
+                    <span id="display-unit-conversion" class="text-xs bg-white/10 px-2.5 py-1 rounded-lg text-slate-300 font-medium">
+                        0 lạng • 0 kg
+                    </span>
+                </div>
+                
+                <div class="flex items-baseline justify-between my-1">
+                    <div class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-white">
+                        <span id="net-weight-display">0</span><span class="text-xl font-sans font-semibold text-slate-400 ml-1">g</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-slate-400">Thành tiền</div>
+                        <div id="total-price-display" class="text-2xl sm:text-3xl font-extrabold text-emerald-400">0 đ</div>
+                    </div>
+                </div>
+
+                <!-- Thanh thông tin phụ -->
+                <div class="mt-3 pt-3 border-t border-white/10 flex justify-between text-xs text-slate-400">
+                    <span>Cân tổng: <strong id="gross-weight-summary" class="text-slate-200">0g</strong></span>
+                    <span>Trừ bì: <strong id="tare-weight-summary" class="text-amber-400">-0g</strong></span>
+                </div>
+            </div>
+
+            <!-- Khối nhập trọng lượng cân của người bán -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 space-y-3.5">
+                <div class="flex items-center justify-between">
+                    <label class="font-bold text-sm flex items-center gap-1.5">
+                        <i class="ph-bold ph-barbell text-emerald-600 dark:text-emerald-400 text-lg"></i>
+                        1. Số cân người bán
+                    </label>
+                    <!-- Chuyển đổi đơn vị nhập g / kg -->
+                    <div class="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                        <button type="button" id="btn-unit-g" onclick="setWeightUnit('g')" class="px-3 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition">Gram (g)</button>
+                        <button type="button" id="btn-unit-kg" onclick="setWeightUnit('kg')" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition">Ký (kg)</button>
+                    </div>
+                </div>
+
+                <!-- Ô nhập số to rõ -->
+                <div class="relative flex items-center">
+                    <input type="number" id="weight-input" inputmode="decimal" placeholder="0" oninput="onWeightInput()" 
+                        class="w-full text-2xl font-bold bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-2xl py-3.5 pl-4 pr-20 outline-none transition">
+                    <button onclick="clearWeight()" class="absolute right-12 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Xóa số">
+                        <i class="ph-fill ph-x-circle text-xl"></i>
+                    </button>
+                    <span id="input-unit-label" class="absolute right-4 font-bold text-slate-400">g</span>
+                </div>
+
+                <!-- Thanh trượt tinh chỉnh nhanh (0 - 3000g) -->
+                <div class="pt-1">
+                    <input type="range" id="weight-slider" min="0" max="3000" step="10" value="0" oninput="onSliderChange()" class="w-full">
+                    <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                        <span>0g</span>
+                        <span>5 lạng</span>
+                        <span>1kg</span>
+                        <span>2kg</span>
+                        <span>3kg</span>
+                    </div>
+                </div>
+
+                <!-- Các nút chọn nhanh mốc lạng phổ biến ở chợ VN -->
+                <div class="grid grid-cols-5 gap-1.5 pt-1">
+                    <button type="button" onclick="setQuickWeight(100)" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-transparent hover:border-emerald-500/30 btn-press">1 lạng</button>
+                    <button type="button" onclick="setQuickWeight(200)" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-transparent hover:border-emerald-500/30 btn-press">2 lạng</button>
+                    <button type="button" onclick="setQuickWeight(300)" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-transparent hover:border-emerald-500/30 btn-press">3 lạng</button>
+                    <button type="button" onclick="setQuickWeight(500)" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-transparent hover:border-emerald-500/30 btn-press">Nửa ký</button>
+                    <button type="button" onclick="setQuickWeight(1000)" class="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-transparent hover:border-emerald-500/30 btn-press">1 kg</button>
+                </div>
+            </div>
+
+            <!-- Khối Trừ Bì (Bao bì, rổ nhựa, hộp xốp) -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="font-bold text-sm flex items-center gap-1.5">
+                        <i class="ph-bold ph-package text-amber-500 text-lg"></i>
+                        2. Trừ bì (Túi, hộp, rổ)
+                    </label>
+                    <span class="text-xs text-slate-400">Đơn vị: gram</span>
+                </div>
+                <div class="grid grid-cols-5 gap-1.5">
+                    <button type="button" onclick="setTare(0)" id="tare-0" class="tare-btn py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-white shadow-sm btn-press">0g</button>
+                    <button type="button" onclick="setTare(10)" id="tare-10" class="tare-btn py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 btn-press">-10g</button>
+                    <button type="button" onclick="setTare(20)" id="tare-20" class="tare-btn py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 btn-press">-20g</button>
+                    <button type="button" onclick="setTare(50)" id="tare-50" class="tare-btn py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 btn-press">-50g</button>
+                    <div class="relative">
+                        <input type="number" id="custom-tare-input" inputmode="numeric" placeholder="Khác" oninput="onCustomTare()"
+                            class="w-full h-full text-center text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-amber-500 rounded-xl outline-none px-1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Khối Nhập Đơn Giá -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="font-bold text-sm flex items-center gap-1.5">
+                        <i class="ph-bold ph-tag text-emerald-600 dark:text-emerald-400 text-lg"></i>
+                        3. Đơn giá bán (VNĐ)
+                    </label>
+                    <!-- Chọn đơn vị tính giá -->
+                    <div class="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                        <button type="button" id="price-unit-kg" onclick="setPriceUnit('kg')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition">/ 1 kg</button>
+                        <button type="button" id="price-unit-100g" onclick="setPriceUnit('100g')" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition">/ 1 lạng</button>
+                        <button type="button" id="price-unit-pack" onclick="setPriceUnit('pack')" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition">/ Gói</button>
+                    </div>
+                </div>
+
+                <div class="relative flex items-center">
+                    <input type="text" id="price-input" inputmode="numeric" placeholder="Ví dụ: 120.000" oninput="onPriceInput(this)" 
+                        class="w-full text-2xl font-bold bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-2xl py-3.5 pl-4 pr-16 outline-none transition">
+                    <span class="absolute right-4 font-bold text-slate-400">đ</span>
+                </div>
+
+                <!-- Gợi ý thêm nghìn đồng nhanh (.000đ) -->
+                <div class="flex gap-2">
+                    <button type="button" onclick="multiplyPrice(1000)" class="flex-1 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200/60 dark:border-emerald-800/60 btn-press">+ .000 đ</button>
+                    <button type="button" onclick="setQuickPrice(50000)" class="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold btn-press">50.000đ</button>
+                    <button type="button" onclick="setQuickPrice(100000)" class="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold btn-press">100.000đ</button>
+                    <button type="button" onclick="clearPrice()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 text-xs font-semibold btn-press">Xóa</button>
+                </div>
+            </div>
+
+            <!-- Tên món & Nút Thêm vào giỏ hàng -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 space-y-3">
+                <input type="text" id="item-name-input" placeholder="Tên món (Tùy chọn, vd: Thịt ba rọi, Cá thu...)" 
+                    class="w-full text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-2xl py-3 px-4 outline-none">
+                
+                <button type="button" onclick="addToCart()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 btn-press transition">
+                    <i class="ph-bold ph-shopping-cart-simple text-xl"></i>
+                    Thêm Vào Giỏ Hàng
+                </button>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: KIỂM TRA CÂN GIAN (VẬT CHUẨN)        -->
+        <!-- ========================================== -->
+        <section id="tab-check" class="hidden space-y-4">
+            <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 rounded-3xl p-4 flex gap-3 items-start">
+                <i class="ph-fill ph-shield-warning text-amber-500 text-2xl shrink-0 mt-0.5"></i>
+                <div class="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                    <strong>Mẹo đi chợ:</strong> Đặt điện thoại, chai nước hoặc chùm chìa khóa đã biết trước trọng lượng lên cân của người bán để kiểm tra độ chính xác ngay lập tức!
+                </div>
+            </div>
+
+            <!-- Bước 1: Chọn vật chuẩn mang theo -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold text-sm flex items-center gap-1.5">
+                        <i class="ph-bold ph-device-mobile text-emerald-600 dark:text-emerald-400 text-lg"></i>
+                        1. Chọn vật chuẩn của bạn
+                    </h2>
+                    <button onclick="toggleCustomItemForm()" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 py-1 px-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
+                        <i class="ph-bold ph-plus"></i> Tự thêm vật
+                    </button>
+                </div>
+
+                <!-- Form thêm vật chuẩn cá nhân (Ẩn mặc định) -->
+                <div id="custom-ref-form" class="hidden bg-slate-50 dark:bg-slate-800/70 p-3 rounded-2xl space-y-2.5 border border-slate-200 dark:border-slate-700">
+                    <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">Lưu vật dụng cá nhân (VD: Điện thoại + ốp của tôi):</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="text" id="ref-name" placeholder="Tên vật..." class="col-span-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none">
+                        <input type="number" id="ref-weight" inputmode="numeric" placeholder="Gram..." class="text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none">
+                    </div>
+                    <button onclick="saveCustomRefItem()" class="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold btn-press">Lưu vào danh sách</button>
+                </div>
+
+                <!-- Danh sách vật chuẩn -->
+                <div id="ref-items-list" class="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+                    <!-- Render bằng JS -->
+                </div>
+            </div>
+
+            <!-- Bước 2: Nhập số hiển thị trên cân của người bán -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 space-y-3">
+                <label class="font-bold text-sm flex items-center gap-1.5">
+                    <i class="ph-bold ph-eye text-emerald-600 dark:text-emerald-400 text-lg"></i>
+                    2. Cân người bán hiển thị bao nhiêu?
+                </label>
+                <div class="relative flex items-center">
+                    <input type="number" id="seller-scale-input" inputmode="numeric" placeholder="Nhập số gram trên cân..." oninput="evaluateScale()"
+                        class="w-full text-2xl font-bold bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-2xl py-3.5 pl-4 pr-14 outline-none transition">
+                    <span class="absolute right-4 font-bold text-slate-400">g</span>
+                </div>
+            </div>
+
+            <!-- Kết quả đánh giá cân -->
+            <div id="scale-verdict-box" class="hidden rounded-3xl p-5 border transition-all">
+                <div class="flex items-center gap-3 mb-2">
+                    <div id="verdict-icon-wrap" class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0">
+                        <i id="verdict-icon" class="ph-fill ph-check-circle text-3xl"></i>
+                    </div>
+                    <div>
+                        <div id="verdict-title" class="font-extrabold text-lg">Cân Chuẩn Xác!</div>
+                        <div id="verdict-subtitle" class="text-xs opacity-90">Sai số nằm trong mức cho phép.</div>
+                    </div>
+                </div>
+                <div id="verdict-detail" class="mt-3 pt-3 border-t border-current/10 text-sm font-medium flex justify-between">
+                    <!-- Render chi tiết chênh lệch -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: GIỎ HÀNG ĐI CHỢ                     -->
+        <!-- ========================================== -->
+        <section id="tab-cart" class="hidden space-y-4">
+            <!-- Thẻ Tổng Tiền Đi Chợ -->
+            <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-5 shadow-xl">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-xs font-medium uppercase tracking-wider text-emerald-100">Tổng tiền giỏ hàng</span>
+                    <span id="cart-count-badge" class="text-xs bg-white/20 px-2.5 py-0.5 rounded-full font-semibold">0 món</span>
+                </div>
+                <div id="cart-grand-total" class="text-3xl sm:text-4xl font-extrabold tracking-tight my-1">0 đ</div>
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-white/15 text-xs text-emerald-100">
+                    <span>Tổng khối lượng: <strong id="cart-total-weight" class="text-white">0 kg</strong></span>
+                    <button onclick="openConfirmModal()" id="btn-clear-all" class="hidden text-white/90 hover:text-white underline font-semibold flex items-center gap-1">
+                        <i class="ph-bold ph-trash"></i> Xóa tất cả
+                    </button>
+                </div>
+            </div>
+
+            <!-- Danh sách món đã lưu -->
+            <div id="cart-items-container" class="space-y-2.5">
+                <!-- Render bằng JS -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Thanh điều hướng dưới cùng (Bottom Navigation Bar) tối ưu thao tác 1 tay -->
+    <nav class="fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 pb-safe">
+        <div class="max-w-lg mx-auto grid grid-cols-3 p-1.5 gap-1">
+            <button onclick="switchTab('calc')" id="nav-calc" class="nav-btn flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-emerald-600 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 font-bold transition">
+                <i class="ph-fill ph-calculator text-2xl mb-0.5"></i>
+                <span class="text-[11px]">Cân & Tính Tiền</span>
+            </button>
+            <button onclick="switchTab('check')" id="nav-check" class="nav-btn flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 font-medium transition">
+                <i class="ph-bold ph-shield-check text-2xl mb-0.5"></i>
+                <span class="text-[11px]">Kiểm Tra Cân</span>
+            </button>
+            <button onclick="switchTab('cart')" id="nav-cart" class="nav-btn relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 font-medium transition">
+                <div class="relative">
+                    <i class="ph-bold ph-shopping-bag text-2xl mb-0.5"></i>
+                    <span id="nav-cart-badge" class="hidden absolute -top-1 -right-2.5 bg-red-500 text-white text-[10px] font-extrabold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 shadow">0</span>
+                </div>
+                <span class="text-[11px]">Giỏ Hàng</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // ==========================================
+        // QUẢN LÝ TRẠNG THÁI ỨNG DỤNG (STATE)
+        // ==========================================
+        let state = {
+            weightGrams: 0,       // Trọng lượng cân tổng (gam)
+            weightUnit: 'g',      // Đơn vị đang nhập: 'g' hoặc 'kg'
+            tareGrams: 0,         // Trọng lượng trừ bì (gam)
+            priceValue: 0,        // Đơn giá (VNĐ)
+            priceUnit: 'kg',      // Đơn vị tính giá: 'kg', '100g', 'pack'
+            cart: [],             // Danh sách món trong giỏ
+            selectedRefId: 'ref-1',
+            customRefItems: []    // Vật chuẩn do người dùng tự lưu
+        };
+
+        // Danh sách vật chuẩn phổ biến mặc định
+        const DEFAULT_REF_ITEMS = [
+            { id: 'ref-1', name: 'Chai nước suối 500ml (Còn nguyên)', weight: 520, icon: 'ph-drop' },
+            { id: 'ref-2', name: 'Lon nước ngọt / Bia 330ml (Nguyên)', weight: 355, icon: 'ph-beer-bottle' },
+            { id: 'ref-3', name: 'iPhone Pro Max / Samsung Ultra (+ Ốp)', weight: 245, icon: 'ph-device-mobile' },
+            { id: 'ref-4', name: 'Điện thoại tầm trung phổ thông', weight: 195, icon: 'ph-device-mobile-camera' },
+            { id: 'ref-5', name: 'Chùm chìa khóa xe máy + khóa nhà', weight: 85, icon: 'ph-key' }
+        ];
+
+        // ==========================================
+        // KHỞI TẠO & LƯU TRỮ LOCALSTORAGE
+        // ==========================================
+        window.onload = function() {
+            loadFromStorage();
+            initTheme();
+            renderRefItems();
+            renderCart();
+            updateCalculation();
+        };
+
+        function loadFromStorage() {
+            try {
+                const savedCart = localStorage.getItem('cho_scale_cart');
+                if (savedCart) state.cart = JSON.parse(savedCart);
+
+                const savedRefs = localStorage.getItem('cho_scale_refs');
+                if (savedRefs) state.customRefItems = JSON.parse(savedRefs);
+            } catch (e) {
+                console.error('Lỗi đọc dữ liệu LocalStorage:', e);
+            }
+        }
+
+        function saveCartToStorage() {
+            try {
+                localStorage.setItem('cho_scale_cart', JSON.stringify(state.cart));
+            } catch (e) {
+                console.error('Lỗi lưu giỏ hàng:', e);
+            }
+        }
+
+        function saveRefsToStorage() {
+            try {
+                localStorage.setItem('cho_scale_refs', JSON.stringify(state.customRefItems));
+            } catch (e) {
+                console.error('Lỗi lưu vật chuẩn:', e);
+            }
+        }
+
+        // ==========================================
+        // GIAO DIỆN SÁNG / TỐI & ĐIỀU HƯỚNG TAB
+        // ==========================================
+        function initTheme() {
+            const isDark = localStorage.getItem('cho_theme') === 'dark' || 
+                          (!localStorage.getItem('cho_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').className = 'ph-bold ph-sun text-xl text-amber-400';
+            }
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('cho_theme', 'light');
+                icon.className = 'ph-bold ph-moon text-xl';
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('cho_theme', 'dark');
+                icon.className = 'ph-bold ph-sun text-xl text-amber-400';
+            }
+        }
+
+        function switchTab(tabName) {
+            // Ẩn tất cả các tab
+            ['calc', 'check', 'cart'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                const navBtn = document.getElementById(`nav-${t}`);
+                navBtn.className = 'nav-btn relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 font-medium transition';
+                const icon = navBtn.querySelector('i');
+                icon.className = icon.className.replace('ph-fill', 'ph-bold');
+            });
+
+            // Hiển thị tab được chọn
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            activeNav.className = 'nav-btn relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl text-emerald-600 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/50 font-bold transition';
+            const activeIcon = activeNav.querySelector('i');
+            activeIcon.className = activeIcon.className.replace('ph-bold', 'ph-fill');
+
+            if (tabName === 'cart') renderCart();
+            if (tabName === 'check') evaluateScale();
+        }
+
+        // ==========================================
+        // ĐỊNH DẠNG SỐ & TIỀN VNĐ
+        // ==========================================
+        function formatVND(amount) {
+            return Math.round(amount).toLocaleString('vi-VN') + ' đ';
+        }
+
+        function showToast(message, isWarning = false) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            const iconEl = document.getElementById('toast-icon');
+            
+            msgEl.textContent = message;
+            iconEl.className = isWarning 
+                ? 'ph-fill ph-warning-circle text-amber-400 text-lg' 
+                : 'ph-fill ph-check-circle text-emerald-400 dark:text-emerald-600 text-lg';
+
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 2200);
+        }
+
+        // ==========================================
+        // LOGIC TAB 1: CÂN & TÍNH TIỀN NHANH
+        // ==========================================
+        function setWeightUnit(unit) {
+            state.weightUnit = unit;
+            const btnG = document.getElementById('btn-unit-g');
+            const btnKg = document.getElementById('btn-unit-kg');
+            const label = document.getElementById('input-unit-label');
+            const input = document.getElementById('weight-input');
+
+            if (unit === 'g') {
+                btnG.className = 'px-3 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition';
+                btnKg.className = 'px-3 py-1 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition';
+                label.textContent = 'g';
+                input.value = state.weightGrams > 0 ? state.weightGrams : '';
+            } else {
+                btnKg.className = 'px-3 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition';
+                btnG.className = 'px-3 py-1 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition';
+                label.textContent = 'kg';
+                input.value = state.weightGrams > 0 ? (state.weightGrams / 1000) : '';
+            }
+        }
+
+        function onWeightInput() {
+            const raw = parseFloat(document.getElementById('weight-input').value);
+            if (isNaN(raw) || raw < 0) {
+                state.weightGrams = 0;
+            } else {
+                state.weightGrams = state.weightUnit === 'kg' ? Math.round(raw * 1000) : Math.round(raw);
+            }
+            document.getElementById('weight-slider').value = Math.min(state.weightGrams, 3000);
+            updateCalculation();
+        }
+
+        function onSliderChange() {
+            const val = parseInt(document.getElementById('weight-slider').value);
+            state.weightGrams = val;
+            const input = document.getElementById('weight-input');
+            input.value = state.weightUnit === 'kg' ? (val / 1000) : val;
+            updateCalculation();
+        }
+
+        function setQuickWeight(grams) {
+            state.weightGrams = grams;
+            document.getElementById('weight-slider').value = Math.min(grams, 3000);
+            const input = document.getElementById('weight-input');
+            input.value = state.weightUnit === 'kg' ? (grams / 1000) : grams;
+            updateCalculation();
+        }
+
+        function clearWeight() {
+            state.weightGrams = 0;
+            document.getElementById('weight-input').value = '';
+            document.getElementById('weight-slider').value = 0;
+            updateCalculation();
+        }
+
+        // Xử lý Trừ Bì
+        function setTare(grams) {
+            state.tareGrams = grams;
+            document.getElementById('custom-tare-input').value = '';
+            updateTareButtonsUI(grams);
+            updateCalculation();
+        }
+
+        function onCustomTare() {
+            const val = parseInt(document.getElementById('custom-tare-input').value);
+            state.tareGrams = (!isNaN(val) && val >= 0) ? val : 0;
+            updateTareButtonsUI(-1); // Bỏ chọn các nút mốc cố định
+            updateCalculation();
+        }
+
+        function updateTareButtonsUI(activeGrams) {
+            [0, 10, 20, 50].forEach(g => {
+                const btn = document.getElementById(`tare-${g}`);
+                if (g === activeGrams) {
+                    btn.className = 'tare-btn py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-white shadow-sm btn-press';
+                } else {
+                    btn.className = 'tare-btn py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 btn-press';
+                }
+            });
+        }
+
+        // Xử lý Đơn Giá
+        function setPriceUnit(unit) {
+            state.priceUnit = unit;
+            ['kg', '100g', 'pack'].forEach(u => {
+                const btn = document.getElementById(`price-unit-${u}`);
+                if (u === unit) {
+                    btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 transition';
+                }
+            });
+            updateCalculation();
+        }
+
+        function onPriceInput(el) {
+            // Chỉ giữ lại chữ số và tự động thêm dấu chấm ngăn cách hàng nghìn
+            const digits = el.value.replace(/\D/g, '');
+            state.priceValue = digits ? parseInt(digits, 10) : 0;
+            el.value = digits ? state.priceValue.toLocaleString('vi-VN') : '';
+            updateCalculation();
+        }
+
+        function multiplyPrice(factor) {
+            if (state.priceValue === 0) state.priceValue = 10;
+            state.priceValue *= factor;
+            document.getElementById('price-input').value = state.priceValue.toLocaleString('vi-VN');
+            updateCalculation();
+        }
+
+        function setQuickPrice(val) {
+            state.priceValue = val;
+            document.getElementById('price-input').value = val.toLocaleString('vi-VN');
+            updateCalculation();
+        }
+
+        function clearPrice() {
+            state.priceValue = 0;
+            document.getElementById('price-input').value = '';
+            updateCalculation();
+        }
+
+        // Tính toán tổng hợp & Cập nhật màn hình LCD
+        function updateCalculation() {
+            const netGrams = Math.max(0, state.weightGrams - state.tareGrams);
+            const lang = +(netGrams / 100).toFixed(2);
+            const kg = +(netGrams / 1000).toFixed(3);
+
+            document.getElementById('net-weight-display').textContent = netGrams.toLocaleString('vi-VN');
+            document.getElementById('display-unit-conversion').textContent = `${lang} lạng • ${kg} kg`;
+            document.getElementById('gross-weight-summary').textContent = `${state.weightGrams.toLocaleString('vi-VN')}g`;
+            document.getElementById('tare-weight-summary').textContent = `-${state.tareGrams.toLocaleString('vi-VN')}g`;
+
+            let totalMoney = 0;
+            if (state.priceUnit === 'kg') {
+                totalMoney = (netGrams / 1000) * state.priceValue;
+            } else if (state.priceUnit === '100g') {
+                totalMoney = (netGrams / 100) * state.priceValue;
+            } else if (state.priceUnit === 'pack') {
+                totalMoney = state.priceValue;
+            }
+
+            document.getElementById('total-price-display').textContent = formatVND(totalMoney);
+            return { netGrams, totalMoney: Math.round(totalMoney) };
+        }
+
+        // Thêm vào giỏ hàng
+        function addToCart() {
+            const { netGrams, totalMoney } = updateCalculation();
+
+            if (state.priceUnit !== 'pack' && netGrams <= 0) {
+                showToast('Vui lòng nhập trọng lượng cân trước!', true);
+                return;
+            }
+            if (totalMoney <= 0) {
+                showToast('Vui lòng nhập đơn giá sản phẩm!', true);
+                return;
+            }
+
+            const nameInput = document.getElementById('item-name-input');
+            const itemName = nameInput.value.trim() || `Món hàng #${state.cart.length + 1}`;
+            
+            let unitLabel = '/kg';
+            if (state.priceUnit === '100g') unitLabel = '/lạng';
+            if (state.priceUnit === 'pack') unitLabel = '/gói';
+
+            const newItem = {
+                id: Date.now(),
+                name: itemName,
+                netGrams: state.priceUnit === 'pack' ? 0 : netGrams,
+                tareGrams: state.tareGrams,
+                unitPrice: state.priceValue,
+                unitLabel: unitLabel,
+                totalPrice: totalMoney
+            };
+
+            state.cart.unshift(newItem);
+            saveCartToStorage();
+            updateCartBadge();
+
+            // Reset tên món để tiện nhập món tiếp theo
+            nameInput.value = '';
+            showToast(`Đã thêm "${itemName}" (${formatVND(totalMoney)})`);
+        }
+
+        // ==========================================
+        // LOGIC TAB 2: KIỂM TRA CÂN GIAN
+        // ==========================================
+        function getAllRefItems() {
+            return [...state.customRefItems, ...DEFAULT_REF_ITEMS];
+        }
+
+        function renderRefItems() {
+            const container = document.getElementById('ref-items-list');
+            const allItems = getAllRefItems();
+
+            container.innerHTML = allItems.map(item => {
+                const isSelected = item.id === state.selectedRefId;
+                const isCustom = item.id.startsWith('custom-');
+                return `
+                    <div onclick="selectRefItem('${item.id}')" class="flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition ${isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40'}">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl ${isSelected ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'} flex items-center justify-center shrink-0">
+                                <i class="ph-bold ${item.icon || 'ph-cube'} text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold leading-snug">${item.name}</div>
+                                <div class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Chuẩn: ${item.weight}g</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${isCustom ? `<button onclick="deleteCustomRef(event, '${item.id}')" class="p-1.5 text-slate-400 hover:text-red-500"><i class="ph-bold ph-trash"></i></button>` : ''}
+                            <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-emerald-500' : 'border-slate-300 dark:border-slate-600'}">
+                                ${isSelected ? '<div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectRefItem(id) {
+            state.selectedRefId = id;
+            renderRefItems();
+            evaluateScale();
+        }
+
+        function toggleCustomItemForm() {
+            const form = document.getElementById('custom-ref-form');
+            form.classList.toggle('hidden');
+        }
+
+        function saveCustomRefItem() {
+            const name = document.getElementById('ref-name').value.trim();
+            const weight = parseInt(document.getElementById('ref-weight').value);
+
+            if (!name || isNaN(weight) || weight <= 0) {
+                showToast('Vui lòng nhập tên và trọng lượng hợp lệ!', true);
+                return;
+            }
+
+            const newItem = {
+                id: 'custom-' + Date.now(),
+                name: name,
+                weight: weight,
+                icon: 'ph-star'
+            };
+
+            state.customRefItems.unshift(newItem);
+            state.selectedRefId = newItem.id;
+            saveRefsToStorage();
+            
+            document.getElementById('ref-name').value = '';
+            document.getElementById('ref-weight').value = '';
+            toggleCustomItemForm();
+            renderRefItems();
+            evaluateScale();
+            showToast('Đã lưu vật chuẩn của bạn!');
+        }
+
+        function deleteCustomRef(event, id) {
+            event.stopPropagation();
+            state.customRefItems = state.customRefItems.filter(i => i.id !== id);
+            if (state.selectedRefId === id) state.selectedRefId = 'ref-1';
+            saveRefsToStorage();
+            renderRefItems();
+            evaluateScale();
+        }
+
+        function evaluateScale() {
+            const sellerWeight = parseFloat(document.getElementById('seller-scale-input').value);
+            const verdictBox = document.getElementById('scale-verdict-box');
+
+            if (isNaN(sellerWeight) || sellerWeight <= 0) {
+                verdictBox.classList.add('hidden');
+                return;
+            }
+
+            const refItem = getAllRefItems().find(i => i.id === state.selectedRefId) || DEFAULT_REF_ITEMS[0];
+            const actualWeight = refItem.weight;
+            const diff = sellerWeight - actualWeight; // Dương = cân báo nặng hơn thực tế (khách bị thiệt/cân thiếu lượng hàng)
+            const percentDiff = Math.abs((diff / actualWeight) * 100).toFixed(1);
+
+            verdictBox.classList.remove('hidden');
+            const iconWrap = document.getElementById('verdict-icon-wrap');
+            const icon = document.getElementById('verdict-icon');
+            const title = document.getElementById('verdict-title');
+            const subtitle = document.getElementById('verdict-subtitle');
+            const detail = document.getElementById('verdict-detail');
+
+            // Sai số cho phép +- 5g hoặc +- 2%
+            if (Math.abs(diff) <= 5 || parseFloat(percentDiff) <= 1.5) {
+                verdictBox.className = 'rounded-3xl p-5 border bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100';
+                iconWrap.className = 'w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0';
+                icon.className = 'ph-fill ph-check-circle text-3xl';
+                title.textContent = 'Cân Chuẩn Xác!';
+                subtitle.textContent = `Chênh lệch không đáng kể (${diff > 0 ? '+' : ''}${diff}g). Bạn yên tâm mua nhé!`;
+            } else if (diff > 0) {
+                // Cân báo nặng hơn thực tế -> Người bán đang ăn gian trọng lượng (cân thiếu hàng)
+                verdictBox.className = 'rounded-3xl p-5 border bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100';
+                iconWrap.className = 'w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0';
+                icon.className = 'ph-fill ph-warning-octagon text-3xl';
+                title.textContent = `Cảnh Báo: Cân Gian (Kê Thêm ${diff}g)!`;
+                subtitle.textContent = `Cân báo nặng hơn thực tế ${percentDiff}%. Mua 1kg sẽ bị thiếu mất ~${Math.round((diff/actualWeight)*1000)}g!`;
+            } else {
+                // Cân báo nhẹ hơn thực tế -> Cân non / có lợi cho khách
+                verdictBox.className = 'rounded-3xl p-5 border bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100';
+                iconWrap.className = 'w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0';
+                icon.className = 'ph-fill ph-info text-3xl';
+                title.textContent = `Cân Báo Nhẹ Hơn (${Math.abs(diff)}g)`;
+                subtitle.textContent = `Cân người bán đang bị non ${percentDiff}% (có lợi cho người mua).`;
+            }
+
+            detail.innerHTML = `
+                <span>Vật chuẩn: <strong>${actualWeight}g</strong></span>
+                <span>Cân hiển thị: <strong>${sellerWeight}g</strong></span>
+            `;
+        }
+
+        // ==========================================
+        // LOGIC TAB 3: GIỎ HÀNG ĐI CHỢ
+        // ==========================================
+        function updateCartBadge() {
+            const badge = document.getElementById('nav-cart-badge');
+            if (state.cart.length > 0) {
+                badge.textContent = state.cart.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function renderCart() {
+            updateCartBadge();
+            const container = document.getElementById('cart-items-container');
+            const totalEl = document.getElementById('cart-grand-total');
+            const countBadge = document.getElementById('cart-count-badge');
+            const weightEl = document.getElementById('cart-total-weight');
+            const clearBtn = document.getElementById('btn-clear-all');
+
+            const grandTotal = state.cart.reduce((sum, item) => sum + item.totalPrice, 0);
+            const totalGrams = state.cart.reduce((sum, item) => sum + item.netGrams, 0);
+
+            totalEl.textContent = formatVND(grandTotal);
+            countBadge.textContent = `${state.cart.length} món`;
+            weightEl.textContent = `${+(totalGrams / 1000).toFixed(2)} kg`;
+
+            if (state.cart.length === 0) {
+                clearBtn.classList.add('hidden');
+                container.innerHTML = `
+                    <div class="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center border border-slate-200/70 dark:border-slate-800">
+                        <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                            <i class="ph-duotone ph-shopping-basket text-3xl"></i>
+                        </div>
+                        <h3 class="font-bold text-base mb-1">Giỏ hàng đang trống</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Hãy cân và tính tiền các món đồ ở Tab đầu tiên để lưu vào danh sách đi chợ nhé.</p>
+                        <button onclick="switchTab('calc')" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold btn-press">Đi cân đồ ngay</button>
+                    </div>
+                `;
+                return;
+            }
+
+            clearBtn.classList.remove('hidden');
+            container.innerHTML = state.cart.map(item => `
+                <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-sm truncate">${item.name}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
+                            ${item.netGrams > 0 ? `<span class="font-medium text-slate-700 dark:text-slate-300">${item.netGrams.toLocaleString('vi-VN')}g (${+(item.netGrams/100).toFixed(1)} lạng)</span>` : '<span>Tính theo gói/phần</span>'}
+                            <span>•</span>
+                            <span>${item.unitPrice.toLocaleString('vi-VN')}đ${item.unitLabel}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 shrink-0">
+                        <div class="font-extrabold text-base text-emerald-600 dark:text-emerald-400">${formatVND(item.totalPrice)}</div>
+                        <button onclick="removeCartItem(${item.id})" aria-label="Xóa món" class="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-500 flex items-center justify-center btn-press">
+                            <i class="ph-bold ph-trash text-base"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function removeCartItem(id) {
+            state.cart = state.cart.filter(item => item.id !== id);
+            saveCartToStorage();
+            renderCart();
+            showToast('Đã xóa món khỏi giỏ hàng');
+        }
+
+        function openConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function executeClearCart() {
+            state.cart = [];
+            saveCartToStorage();
+            renderCart();
+            closeConfirmModal();
+            showToast('Đã dọn sạch giỏ hàng!');
+        }
+    </script>
+</body>
+</html>
